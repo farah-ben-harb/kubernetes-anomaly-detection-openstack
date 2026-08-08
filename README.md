@@ -1,33 +1,63 @@
 # Kubernetes Anomaly Detection Service
 
-FastAPI-based service that performs anomaly detection on Kubernetes pod metrics
-fetched from Prometheus. It uses `StandardScaler` + `IsolationForest` to score
-pods based on:
+FastAPI-based service that performs anomaly detection on Kubernetes pod metrics fetched from Prometheus.
+
+It uses `StandardScaler` and `IsolationForest` to score pods based on:
 
 - CPU usage: `rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[1m])`
 - Memory usage: `container_memory_usage_bytes{container!="",container!="POD"}`
 - Pod restart count: `kube_pod_container_status_restarts_total`
 
-The service exposes:
+## Architecture
 
-- REST endpoint `/detect` – anomaly flag and score per pod.
-- Prometheus metrics endpoint `/metrics` – Gauges `anomaly_flag` and
-  `anomaly_score` per pod.
+```mermaid
+flowchart LR
+    Prometheus[Prometheus] --> API[FastAPI Service]
+    API --> Detect[/detect]
+    API --> Metrics[/metrics]
+    API --> Model[IsolationForest scoring]
+```
 
-This project was also used in a private cloud environment built on OpenStack,
-where Kubernetes workloads were monitored through Prometheus and evaluated for
-runtime anomalies.
+## What the Service Exposes
 
----
+- `GET /detect` for anomaly flag and score per pod
+- `GET /metrics` for Prometheus metrics
 
-## Project Structure
+## Tech Stack
 
-- `app/`
-  - `config.py` – configuration and environment variables.
-  - `prometheus/`
-    - `api_client.py` – thin Prometheus HTTP API client.
-  - `ml/`
-    - `anomaly_detector.py` – model training + inference logic.
+- Backend: FastAPI, Python
+- ML: StandardScaler, IsolationForest
+- Observability: Prometheus metrics
+- Runtime: Docker, Kubernetes
+- Environment: OpenStack private cloud
+
+## Repository Structure
+
+- `app/config.py` configuration and environment variables
+- `app/prometheus/` thin Prometheus HTTP API client
+- `app/ml/anomaly_detector.py` model training and inference logic
+- `k8s-deployment.yaml` Kubernetes deployment manifest
+- `Dockerfile` container build
+
+## Getting Started
+
+- Install dependencies from `requirements.txt`
+- Configure the Prometheus endpoint and model parameters
+- Run the FastAPI service locally or build the Docker image
+- Apply the Kubernetes manifest for cluster deployment
+
+## Branching and Commits
+
+- Use branches such as `feat/<area>`, `fix/<area>`, `docs/<area>`, or `ml/<area>`
+- Keep commits focused on one observable change
+- Prefer Conventional Commits such as `fix(metrics): normalize anomaly score output`
+- Avoid placeholder messages like `working`, `test`, or `final`
+
+## Contributing
+
+- Keep model and metric assumptions documented
+- Do not commit live credentials or environment-specific endpoints
+- Favor small PRs that are easy to validate
   - `api/`
     - `main.py` – FastAPI app and HTTP endpoints.
 - `requirements.txt` – Python dependencies.
