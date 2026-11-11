@@ -266,39 +266,31 @@ If you are using Prometheus Operator, create a `ServiceMonitor` targeting the
 
 ## Kubernetes Deployment
 
-You can deploy to Kubernetes **without** building or hosting your own image by
-using the stock `python:3.11-slim` image and mounting this project as a
-`ConfigMap`.
+The supported deployment path builds the application image from the repository
+`Dockerfile`. The Kubernetes manifest does not copy source code into a
+`ConfigMap` or install dependencies during pod startup.
 
-### 1. Create the ConfigMap with your code
+### 1. Build the application image
 
-From the project root (where `app/` and `requirements.txt` live):
+From the project root:
 
 ```bash
-rm -f code.tar.gz
-tar czf code.tar.gz app requirements.txt
-
-kubectl create configmap anomaly-detector-code --from-file=code.tar.gz
+docker build -t k8s-anomaly-detector:local .
 ```
 
-This will create a `ConfigMap` named `anomaly-detector-code` that contains the
-source code and `requirements.txt` packaged as a single tarball. The deployment
-mounts it at `/config` and unpacks it into `/workspace` at container startup.
+For a local `kind` cluster, load the image explicitly:
+
+```bash
+kind load docker-image k8s-anomaly-detector:local --name <cluster-name>
+```
 
 ### 2. Deploy the manifest
 
-The file `k8s-deployment.yaml` is already configured to:
+The file `k8s-deployment.yaml` is configured to:
 
-- Use `python:3.11-slim` as the base image.
-- Mount the `anomaly-detector-code` ConfigMap at `/config`.
-- Run:
-  ```bash
-  mkdir -p /workspace &&
-  tar xzf /config/code.tar.gz -C /workspace &&
-  cd /workspace &&
-  pip install --no-cache-dir -r requirements.txt &&
-  uvicorn app.api.main:app --host 0.0.0.0 --port 8000
-  ```
+- Run the image built from the application dependencies.
+- Use a non-root container with a runtime seccomp profile.
+- Define resource requests and limits and HTTP readiness/liveness probes.
 
 Apply it:
 
@@ -336,27 +328,13 @@ Then open:
 
 ### 4. Update or delete the deployment
 
-- To update code or dependencies:
-  1. Recreate the ConfigMap with the latest files:
-     ```bash
-     kubectl delete configmap anomaly-detector-code
-     rm -f code.tar.gz
-     tar czf code.tar.gz app requirements.txt
-     kubectl create configmap anomaly-detector-code --from-file=code.tar.gz
-     ```
-  2. Re-apply the manifest:
-     ```bash
-     kubectl apply -f k8s-deployment.yaml
-     ```
+- To update code or dependencies, build and publish a versioned image, update
+  the `image` field in the manifest, and re-apply it. The `:local` tag is only
+  intended for local clusters and is not an immutable release reference.
 
 - To delete the deployment and service:
   ```bash
   kubectl delete -f k8s-deployment.yaml
-  ```
-
-- (Optional) To also remove the ConfigMap:
-  ```bash
-  kubectl delete configmap anomaly-detector-code
   ```
 
 ---
@@ -364,8 +342,8 @@ Then open:
 ## API Overview
 
 - `GET /healthz`
-  - Returns service status, whether the model is trained, and configured
-    `PROMETHEUS_URL`.
+  - Returns service status and whether the model is trained. Internal
+    Prometheus topology is not returned.
 
 - `GET /detect`
   - On-demand anomaly detection over current metrics.

@@ -14,17 +14,18 @@ spec:
       labels:
         app: k8s-anomaly-detector
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: anomaly-detector
-          image: python:3.11-slim
+          image: k8s-anomaly-detector:local
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c"]
-          args:
-            - mkdir -p /workspace &&
-              tar xzf /config/code.tar.gz -C /workspace &&
-              cd /workspace &&
-              pip install --no-cache-dir -r requirements.txt &&
-              uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: PROMETHEUS_URL
               value: "http://prometheus:9090"
@@ -33,13 +34,25 @@ spec:
           ports:
             - name: http
               containerPort: 8000
-          volumeMounts:
-            - name: code
-              mountPath: /config
-      volumes:
-        - name: code
-          configMap:
-            name: anomaly-detector-code
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
 ---
 apiVersion: v1
 kind: Service
