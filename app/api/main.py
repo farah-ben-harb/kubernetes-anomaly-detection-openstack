@@ -4,7 +4,6 @@ from typing import List, Dict, Any, Set
 from fastapi import FastAPI, HTTPException, Response
 from prometheus_client import Gauge, generate_latest, CONTENT_TYPE_LATEST
 
-from app import config
 from app.ml.anomaly_detector import AnomalyDetector, PodAnomalyResult
 from app.prometheus.api_client import PrometheusAPI, PrometheusError
 
@@ -83,13 +82,12 @@ def healthz() -> Dict[str, Any]:
     """
     Health check endpoint.
 
-    Returns a small JSON payload containing a status flag, whether the model
-    is currently trained, and the configured Prometheus URL.
+    Returns only service state. Internal Prometheus topology is intentionally
+    not exposed by the health endpoint.
     """
     return {
         "status": "ok",
         "model_trained": detector.is_trained,
-        "prometheus_url": config.PROMETHEUS_URL,
     }
 
 
@@ -132,7 +130,7 @@ def detect() -> Dict[str, Any]:
         logger.exception("Detection failed: %s", exc)
         raise HTTPException(
             status_code=500,
-            detail=str(exc),
+            detail="Anomaly detection failed.",
         ) from exc
 
     _update_prometheus_metrics(results)

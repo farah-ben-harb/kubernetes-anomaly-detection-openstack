@@ -66,7 +66,7 @@ class PrometheusAPI:
             or the payload status is not ``\"success\"``.
         """
         if resp.status_code != 200:
-            raise PrometheusError(f"Prometheus HTTP {resp.status_code}: {resp.text}")
+            raise PrometheusError(f"Prometheus HTTP {resp.status_code}")
 
         try:
             payload = resp.json()
@@ -74,7 +74,7 @@ class PrometheusAPI:
             raise PrometheusError("Failed to decode Prometheus response as JSON") from exc
 
         if payload.get("status") != "success":
-            raise PrometheusError(f"Prometheus error: {payload}")
+            raise PrometheusError("Prometheus returned an error response")
 
         data = payload.get("data", {})
         result = data.get("result")
@@ -106,7 +106,7 @@ class PrometheusAPI:
         try:
             resp = requests.get(url, params={"query": promql}, timeout=self.timeout)
         except RequestException as exc:
-            raise PrometheusError(f"Failed to query Prometheus at {url}: {exc}") from exc
+            raise PrometheusError("Prometheus request failed") from exc
         return self._handle_response(resp)
 
     def query_range(
@@ -151,5 +151,5 @@ class PrometheusAPI:
         try:
             resp = requests.get(url, params=params, timeout=self.timeout)
         except RequestException as exc:
-            raise PrometheusError(f"Failed to query Prometheus at {url}: {exc}") from exc
+            raise PrometheusError("Prometheus request failed") from exc
         return self._handle_response(resp)
