@@ -19,7 +19,7 @@ def test_detect_hides_internal_runtime_errors(monkeypatch) -> None:
         is_trained = True
 
         def detect_current(self):
-            raise RuntimeError("internal prometheus token")
+            raise RuntimeError("internal prometheus marker")
 
     monkeypatch.setattr(main, "detector", FailingDetector())
 
@@ -27,4 +27,4 @@ def test_detect_hides_internal_runtime_errors(monkeypatch) -> None:
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Anomaly detection failed."
-    assert "internal prometheus token" not in response.text
+    assert "internal prometheus marker" not in response.text
